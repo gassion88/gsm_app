@@ -56,14 +56,37 @@ class _MainState extends State<MainWidget> {
   Widget build(BuildContext context) {
     return Column(
       children:  [
-        const SizedBox(height: 20,),
+        const SizedBox(height: 20),
         ProfileButton( title: 'Auto mode', isButtonActive: autoSMS, onTap: (value) {
-         setState(() {
-              autoSMS=value;
-
-            });
-              }
-              ),
+           setState(() {
+                autoSMS=value;
+        
+              });
+                }
+                ),
+        Expanded(
+          child: Row(
+            children: const [
+              Expanded(child: Center(
+                child: Text('Отправлено'),
+              )),
+              Expanded(child: Center(
+                child: Text('Ошибки'),
+              ))
+        
+            ],
+          ),
+        ),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('История'),       
+            ],
+          ),
+        ),         
+        
 
       ],
     );
