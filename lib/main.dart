@@ -75,7 +75,8 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     animation.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
         await _sendRequest();
-        _sendSMS();
+        await Future.delayed(const Duration(seconds: 1));
+        await _sendSMS();
       } else if (status == AnimationStatus.dismissed) controller.forward();
     });
   }
@@ -108,20 +109,45 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     }
   }
 
-  void _sendSMS() async {
-    setState(() {
-      sending = true;
-      print('Отправка смс');
-    });
+  Future _sendSMS() async {
+    for (int i = 0; i < data.length - 1; i++) {
+      if (data[i]['status'] == 0) {
+        setState(() {
+          sending = true;
+          print('Отправка смс');
+        });
+        break;
+      }
+    }
+    if (sending) {
+      for (int i = 0; i < data.length; i++) {
+        if (data[i]['status'] == 0) {
+          //Запуск анимации отправки
+          setState(() {
+            data[i]['status'] = '1';
+          });
 
-    timer = Timer(const Duration(milliseconds: 2000), () {
-      setState(() {
-        sending = false;
-        print('Завершение отправки');
-        controller.value = 0.0;
-        controller.forward();
+          //Отправка
+          await Future.delayed(const Duration(seconds: 1));
+          setState(() {
+            data[i]['status'] = '2';
+          });
+        }
+      }
+
+      timer = Timer(const Duration(milliseconds: 2000), () {
+        setState(() {
+          sending = false;
+          print('Завершение отправки');
+          controller.value = 0.0;
+          controller.forward();
+        });
       });
-    });
+    } else {
+      controller.value = 0.0;
+      controller.forward();
+    }
+    return true;
   }
 
   @override
@@ -241,7 +267,12 @@ class _SmsHistoryState extends State<SmsHistory> {
         Expanded(child: Text(widget.number)),
         Expanded(child: Text(widget.text)),
         Expanded(child: Text(widget.date)),
-        Expanded(child: Text(widget.status))
+        Expanded(child: Text(widget.status)),
+        widget.status == '0'
+            ? Container(child: const Icon(Icons.error))
+            : widget.status == '1'
+                ? Container(child: const CircularProgressIndicator())
+                : Container(child: const Icon(Icons.send_to_mobile))
       ],
     );
   }
