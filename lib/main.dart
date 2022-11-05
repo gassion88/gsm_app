@@ -1,9 +1,11 @@
+import 'dart:async' show Timer;
+
 import 'package:flutter/material.dart';
 import 'package:gsm_app/const.dart';
 import 'package:dio/dio.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -16,13 +18,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'GSMm1'),
+      home: MyHomePage(title: 'GSMm1'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  MyHomePage({super.key, required this.title});
 
   final String title;
 
@@ -50,27 +52,30 @@ class MainWidget extends StatefulWidget {
 
 class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   late Response request;
-  bool autoSMS = false;
-  bool dat = false;
+  late bool autoSMS = false;
+  late bool dat = false;
   late List data;
   late Animation<double> animation;
   late AnimationController controller;
   late bool doun = false;
+  late bool sending = false;
+  late Timer timer;
 
   @override
   void initState() {
     super.initState();
-    controller = new AnimationController(
-        vsync: this, duration: new Duration(seconds: 10));
+    controller =
+        AnimationController(vsync: this, duration: Duration(seconds: 10));
     Tween<double> tween = Tween<double>(begin: 0.0, end: 1.0);
     animation = tween.animate(controller);
     animation.addListener(() {
       setState(() {});
     });
     controller.forward();
-    animation.addStatusListener((status) {
+    animation.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
-        _sendRequest();
+        await _sendRequest();
+        _sendSMS();
       } else if (status == AnimationStatus.dismissed) controller.forward();
     });
   }
@@ -81,44 +86,42 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  void _sendRequest() async {
+  Future<List> _sendRequest() async {
     try {
       setState(() {
         doun = true;
+        print('Получение данных');
       });
       Dio dio = Dio();
       request = await dio.get('https://hvarna.ru/api/v1/gsm/sms');
       dat = true;
-      data = request.data;
+
       //print(data);
       setState(() {
         doun = false;
-        controller.value = 0.0;
-        controller.forward();
+        print('Завершение получения данных');
       });
+
+      return data = request.data;
     } catch (e) {
-      print(e);
+      throw Text('${e}');
     }
   }
 
   void _sendSMS() async {
-    try {
+    setState(() {
+      sending = true;
+      print('Отправка смс');
+    });
+
+    timer = Timer(const Duration(milliseconds: 2000), () {
       setState(() {
-        doun = true;
-      });
-      Dio dio = Dio();
-      request = await dio.get('https://hvarna.ru/api/v1/gsm/sms');
-      dat = true;
-      data = request.data;
-      //print(data);
-      setState(() {
-        doun = false;
+        sending = false;
+        print('Завершение отправки');
         controller.value = 0.0;
         controller.forward();
       });
-    } catch (e) {
-      print(e);
-    }
+    });
   }
 
   @override
@@ -132,7 +135,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
             onTap: (value) {
               dat = value;
               autoSMS = value;
-              _sendRequest();
+              //_sendRequest();
             }),
         Expanded(
           child: Row(
@@ -167,6 +170,15 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
                   : const SizedBox(
                       height: 5,
                     ),
+              sending
+                  ? const Text(
+                      'Отправка смс...',
+                      style: TextStyle(color: Colors.green),
+                    )
+                  : const SizedBox(
+                      height: 5,
+                    ),
+
               const SizedBox(height: 20),
               LinearProgressIndicator(
                 value: animation.value,
@@ -202,30 +214,34 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   }
 }
 
-class SmsHistory extends StatelessWidget {
+class SmsHistory extends StatefulWidget {
   final String id;
   final String number;
   final String text;
   final String date;
   final String status;
-  const SmsHistory({
-    Key? key,
+  SmsHistory({
     required this.id,
     required this.number,
     required this.text,
     required this.date,
     required this.status,
-  }) : super(key: key);
+  });
 
+  @override
+  State<SmsHistory> createState() => _SmsHistoryState();
+}
+
+class _SmsHistoryState extends State<SmsHistory> {
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(id)),
-        Expanded(child: Text(number)),
-        Expanded(child: Text(text)),
-        Expanded(child: Text(date)),
-        Expanded(child: Text(status))
+        Expanded(child: Text(widget.id)),
+        Expanded(child: Text(widget.number)),
+        Expanded(child: Text(widget.text)),
+        Expanded(child: Text(widget.date)),
+        Expanded(child: Text(widget.status))
       ],
     );
   }
@@ -233,13 +249,10 @@ class SmsHistory extends StatelessWidget {
 
 class ProfileButton extends StatefulWidget {
   final String title;
-  bool isButtonActive;
+  final bool isButtonActive;
   final Function onTap;
   ProfileButton(
-      {super.key,
-      required this.title,
-      required this.onTap,
-      required this.isButtonActive});
+      {required this.title, required this.onTap, required this.isButtonActive});
 
   @override
   State<ProfileButton> createState() => _ProfileButtonState();
