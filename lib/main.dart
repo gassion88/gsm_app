@@ -60,6 +60,9 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   late bool doun = false;
   late bool sending = false;
   late Timer timer;
+  bool? connect;
+  bool? sended;
+  var err;
 
   @override
   void initState() {
@@ -74,9 +77,23 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     controller.forward();
     animation.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
-        await _sendRequest();
-        await Future.delayed(const Duration(seconds: 1));
-        await _sendSMS();
+        connect = await _sendRequest();
+
+        if (connect != null && connect == true) {
+          sended = await _sendSMS();
+
+          if (sended != null && sended == true) {
+            print('Сообщение отправлено');
+          } else
+            print('Проблемы с отправкой');
+        } else
+          print('Нет подключения');
+
+        controller.value = 0.0;
+        controller.forward();
+
+        //await Future.delayed(const Duration(seconds: 1));
+
       } else if (status == AnimationStatus.dismissed) controller.forward();
     });
   }
@@ -87,7 +104,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<List> _sendRequest() async {
+  Future<bool?> _sendRequest() async {
     try {
       setState(() {
         doun = true;
@@ -95,6 +112,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
       });
       Dio dio = Dio();
       request = await dio.get('https://hvarna.ru/api/v1/gsm/sms');
+      data = request.data;
       dat = true;
 
       //print(data);
@@ -103,51 +121,65 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
         print('Завершение получения данных');
       });
 
-      return data = request.data;
-    } catch (e) {
-      throw Text('${e}');
+      return true;
+    } on DioError catch (e) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx and is also not 304.
+      if (e.response != null) {
+        print(e);
+      } else {
+        // Something happened in setting up or sending the request that triggered an Error
+
+        if (e.error.osError.errorCode == 11001) {
+          print('Нет подключения к интернету');
+        }
+        err = e;
+        return false;
+      }
     }
   }
 
-  Future _sendSMS() async {
-    for (int i = 0; i < data.length - 1; i++) {
-      if (data[i]['status'] == 0) {
-        setState(() {
-          sending = true;
-          print('Отправка смс');
-        });
-        break;
-      }
-    }
-    if (sending) {
-      for (int i = 0; i < data.length; i++) {
+  Future<bool?> _sendSMS() async {
+    try {
+      for (int i = 0; i < data.length - 1; i++) {
         if (data[i]['status'] == 0) {
-          //Запуск анимации отправки
           setState(() {
-            data[i]['status'] = '1';
+            sending = true;
+            print('Отправка смс');
           });
-
-          //Отправка
-          await Future.delayed(const Duration(seconds: 1));
-          setState(() {
-            data[i]['status'] = '2';
-          });
+          break;
         }
       }
+      if (sending) {
+        for (int i = 0; i < data.length; i++) {
+          if (data[i]['status'] == 0) {
+            //Запуск анимации отправки
+            setState(() {
+              data[i]['status'] = '1';
+            });
 
-      timer = Timer(const Duration(milliseconds: 2000), () {
-        setState(() {
-          sending = false;
-          print('Завершение отправки');
-          controller.value = 0.0;
-          controller.forward();
+            //Отправка
+            await Future.delayed(const Duration(seconds: 1));
+            setState(() {
+              data[i]['status'] = '2';
+            });
+            break;
+          }
+        }
+
+        timer = Timer(const Duration(milliseconds: 3000), () {
+          setState(() {
+            sending = false;
+            print('Завершение отправки');
+            controller.value = 0.0;
+            controller.forward();
+          });
         });
-      });
-    } else {
-      controller.value = 0.0;
-      controller.forward();
+      } else {}
+      return true;
+    } catch (e) {
+      return false;
     }
-    return true;
   }
 
   @override
