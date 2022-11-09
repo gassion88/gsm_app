@@ -3,7 +3,7 @@ import 'dart:async' show Timer;
 import 'package:flutter/material.dart';
 import 'package:gsm_app/const.dart';
 import 'package:dio/dio.dart';
-import 'package:telephony/telephony.dart';
+import 'package:flutter_sms/flutter_sms.dart';
 
 void main() {
   runApp(MyApp());
@@ -64,10 +64,6 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   bool? connect;
   bool? sended;
   bool _canSend = false;
-  final Telephony telephony = Telephony.instance;
-  final SmsSendStatusListener listener = (SendStatus status) {
-    print(status);
-  };
   String? _output;
   var err;
 
@@ -112,8 +108,8 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<bool?> _canSendSMS() async {
-    bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
+  /*Future<bool?> _canSendSMS() async {
+   // bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
     /*bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
     DataState canSms = await telephony.cellularDataState;
     //List<SignalStrength> canSms = await telephony.signalStrengths;
@@ -131,6 +127,22 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     }
 
     return true;
+  }*/
+
+  void _sendSMSS(String message, List<String> recipents) async {
+    try {
+      bool _can = await canSendSMS();
+      String _result = await sendSMS(
+          message: message, recipients: recipents, sendDirect: true);
+
+      Future.delayed(const Duration(seconds: 2), () {
+        print('11111111111'); // Prints after 1 second.
+      });
+      print(_can);
+      print(_result);
+    } catch (e) {
+      print(e);
+    }
   }
 
   Future<bool?> _sendRequest() async {
@@ -222,7 +234,12 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
             onTap: (value) {
               setState(() {
                 autoSMS = value;
-                if (value) _canSendSMS();
+                if (value) {
+                  String message = "This is a test message!";
+                  List<String> recipents = ["+79298119014"];
+
+                  _sendSMSS(message, recipents);
+                }
               });
             }),
         Expanded(
