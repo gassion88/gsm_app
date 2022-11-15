@@ -89,21 +89,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
         await checkSms();
 
         if (autoSMS) _sendSMSS();
-/*
-        if (connect != null && connect == true) {
-          sended = await _sendSMS();
 
-          if (sended != null && sended == true) {
-            print('Сообщение отправлено');
-          } else
-            print('Проблемы с отправкой');
-        } else
-          print('Нет подключения');
-
-        controller.value = 0.0;
-        controller.forward();
-
-        //await Future.delayed(const Duration(seconds: 1));*/
         controller.value = 0.0;
         controller.forward();
       } else if (status == AnimationStatus.dismissed) controller.forward();
@@ -145,25 +131,17 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
         for (int i = 0; i <= messages.length - 1; i++) {
           if (messages[i].body?.compareTo(data[k]['text']) == 0) {
             sended = true;
-            setState(() {
-              data[k]['stsus'] = 2;
-            });
-            request = await dio.post(
-                'https://hvarna.ru/api/v1/gsm/status?id=${data[k]['id']}&status=2');
+            request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
+                data: {'id': data[k]['id'], 'status': '2'});
 
-            //запрос на сервер
             print('Запрос на сервер');
             break;
           }
         }
         if (!sended) {
-          request = await dio.post(
-              'https://hvarna.ru/api/v1/gsm/status?id${data[k]['id']}&status=3');
-          setState(() {
-            data[k]['stsus'] = 3;
-          });
-
-          print(' не отправлено');
+          request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
+              data: {'id': data[k]['id'], 'status': '3'});
+          print('Сообщение не отправлено');
         }
       }
     }
@@ -174,29 +152,13 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     setState(() {});
     for (int i = 0; i <= data.length - 1; i++) {
       if (data[i]['status'] == 0) {
-        SmsMessage message =
-            SmsMessage(data[i]['number'].toString(), data[i]['text']);
+        SmsMessage message = SmsMessage(data[i]['number'], data[i]['text']);
         await sender.sendSms(message);
+        request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
+            data: {'id': data[i]['id'], 'status': '1'});
 
-        data[i]['stsus'] = 1;
-
-        List<SmsMessage> messages =
-            await query.querySms(kinds: [SmsQueryKind.Sent]);
-        int found = 0;
-        for (int k = 0; k <= messages.length - 1; k++) {
-          if (data[i]['text'] != null) {
-            if (messages[k].body?.compareTo(data[i]['text']) == 0) {
-              found = found + 1;
-              print('Сообщение отправлено');
-              break;
-            }
-          }
-        }
-        if (found == 0) {
-          print('Сообщение не отправлено');
-        }
-      } else
-        print('Новых сообщений нет...');
+        break;
+      }
     }
   }
 
