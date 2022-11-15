@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:gsm_app/const.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_sms/flutter_sms.dart';
+import 'package:sms_advanced/sms_advanced.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 void main() {
   runApp(MyApp());
@@ -66,6 +68,9 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   bool _canSend = false;
   String? _output;
   var err;
+  SmsQuery query = new SmsQuery();
+  SmsSender sender = SmsSender();
+  Dio dio = Dio();
 
   @override
   void initState() {
@@ -81,6 +86,9 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     animation.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
         connect = await _sendRequest();
+        await checkSms();
+
+        if (autoSMS) _sendSMSS();
 /*
         if (connect != null && connect == true) {
           sended = await _sendSMS();
@@ -128,20 +136,67 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
 
     return true;
   }*/
+  Future<bool?> checkSms() async {
+    List<SmsMessage> messages =
+        await query.querySms(kinds: [SmsQueryKind.Sent]);
+    for (int k = 0; k <= data.length - 1; k++) {
+      if (data[k]['status'] == 1) {
+        bool sended = false;
+        for (int i = 0; i <= messages.length - 1; i++) {
+          if (messages[i].body?.compareTo(data[k]['text']) == 0) {
+            sended = true;
+            setState(() {
+              data[k]['stsus'] = 2;
+            });
+            request = await dio.post(
+                'https://hvarna.ru/api/v1/gsm/status?id=${data[k]['id']}&status=2');
 
-  void _sendSMSS(String message, List<String> recipents) async {
-    try {
-      bool _can = await canSendSMS();
-      String _result = await sendSMS(
-          message: message, recipients: recipents, sendDirect: true);
+            //запрос на сервер
+            print('Запрос на сервер');
+            break;
+          }
+        }
+        if (!sended) {
+          request = await dio.post(
+              'https://hvarna.ru/api/v1/gsm/status?id${data[k]['id']}&status=3');
+          setState(() {
+            data[k]['stsus'] = 3;
+          });
 
-      Future.delayed(const Duration(seconds: 2), () {
-        print('11111111111'); // Prints after 1 second.
-      });
-      print(_can);
-      print(_result);
-    } catch (e) {
-      print(e);
+          print(' не отправлено');
+        }
+      }
+    }
+    return true;
+  }
+
+  void _sendSMSS() async {
+    setState(() {});
+    for (int i = 0; i <= data.length - 1; i++) {
+      if (data[i]['status'] == 0) {
+        SmsMessage message =
+            SmsMessage(data[i]['number'].toString(), data[i]['text']);
+        await sender.sendSms(message);
+
+        data[i]['stsus'] = 1;
+
+        List<SmsMessage> messages =
+            await query.querySms(kinds: [SmsQueryKind.Sent]);
+        int found = 0;
+        for (int k = 0; k <= messages.length - 1; k++) {
+          if (data[i]['text'] != null) {
+            if (messages[k].body?.compareTo(data[i]['text']) == 0) {
+              found = found + 1;
+              print('Сообщение отправлено');
+              break;
+            }
+          }
+        }
+        if (found == 0) {
+          print('Сообщение не отправлено');
+        }
+      } else
+        print('Новых сообщений нет...');
     }
   }
 
@@ -151,7 +206,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
         doun = true;
         print('Получение данных');
       });
-      Dio dio = Dio();
+
       request = await dio.get('https://hvarna.ru/api/v1/gsm/sms');
       data = request.data;
       dat = true;
@@ -234,12 +289,6 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
             onTap: (value) {
               setState(() {
                 autoSMS = value;
-                if (value) {
-                  String message = "This is a test message!";
-                  List<String> recipents = ["+79298119014"];
-
-                  _sendSMSS(message, recipents);
-                }
               });
             }),
         Expanded(
