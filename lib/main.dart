@@ -64,6 +64,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
   late bool sending = false;
   late Timer timer;
   bool? connect;
+  bool? check;
   bool? sended;
   bool _canSend = false;
   String? _output;
@@ -86,9 +87,13 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     animation.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
         connect = await _sendRequest();
-        await checkSms();
 
-        if (autoSMS) _sendSMSS();
+        if (connect != null && connect == true) {
+          check = await checkSms();
+          if (check != null && check == true) {
+            if (autoSMS) _sendSMSS();
+          }
+        }
 
         controller.value = 0.0;
         controller.forward();
@@ -102,60 +107,50 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  /*Future<bool?> _canSendSMS() async {
-   // bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
-    /*bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
-    DataState canSms = await telephony.cellularDataState;
-    //List<SignalStrength> canSms = await telephony.signalStrengths;
-    print(canSms);
-    SimState simState = await telephony.simState;
-    print(simState);
-    return true;*/
-    try {
-      await telephony.sendSms(
-          to: "+79298116987", message: "101", statusListener: listener);
-      listener;
-    } catch (e) {
-      print(e);
-      listener;
-    }
-
-    return true;
-  }*/
   Future<bool?> checkSms() async {
-    List<SmsMessage> messages =
-        await query.querySms(kinds: [SmsQueryKind.Sent]);
-    for (int k = 0; k <= data.length - 1; k++) {
-      if (data[k]['status'] == 1) {
-        bool sended = false;
-        for (int i = 0; i <= messages.length - 1; i++) {
-          if (messages[i].body?.compareTo(data[k]['text']) == 0) {
-            sended = true;
-            request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
-                data: {'id': data[k]['id'], 'status': '2'});
-
-            print('Запрос на сервер');
-            break;
+    try {
+      List<SmsMessage> messages =
+          await query.querySms(kinds: [SmsQueryKind.Sent]);
+      for (int k = 0; k <= data.length - 1; k++) {
+        if (data[k]['status'] == 1) {
+          late Response req;
+          bool sended = false;
+          for (int i = 0; i <= messages.length - 1; i++) {
+            if (messages[i].body?.compareTo(data[k]['text']) == 0) {
+              req = await dio.get(
+                  'https://hvarna.ru/api/v1/gsm/status?id=${data[k]['id']}&status=2');
+              data[k]['status'] = '2';
+              sended = true;
+              print('Запрос на сервер');
+              return false;
+            }
+          }
+          https: //hvarna.ru/api/v1/gsm/status?id=6&status=3
+          if (!sended) {
+            req = await dio.get(
+                'https://hvarna.ru/api/v1/gsm/status?id=${data[k]['id']}&status=3');
+            data[k]['status'] = '3';
+            print('Сообщение не отправлено');
+            return false;
           }
         }
-        if (!sended) {
-          request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
-              data: {'id': data[k]['id'], 'status': '3'});
-          print('Сообщение не отправлено');
-        }
       }
+      return true;
+    } catch (e) {
+      print(e);
+      return false;
     }
-    return true;
   }
 
   void _sendSMSS() async {
-    setState(() {});
     for (int i = 0; i <= data.length - 1; i++) {
       if (data[i]['status'] == 0) {
+        late Response req;
         SmsMessage message = SmsMessage(data[i]['number'], data[i]['text']);
         await sender.sendSms(message);
-        request = await dio.post('https://hvarna.ru/api/v1/gsm/status',
-            data: {'id': data[i]['id'], 'status': '1'});
+        req = await dio.get(
+            'https://hvarna.ru/api/v1/gsm/status?id=${data[i]['id']}&status=1');
+        data[i]['status'] = '1';
 
         break;
       }
@@ -314,7 +309,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
                                       id: data[index]['id'].toString(),
                                       number: data[index]['number'].toString(),
                                       text: data[index]['text'],
-                                      date: data[index]['date'],
+                                      date: data[index]['created_at'],
                                       status:
                                           data[index]['status'].toString()));
                             }),
@@ -351,20 +346,35 @@ class SmsHistory extends StatefulWidget {
 class _SmsHistoryState extends State<SmsHistory> {
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(widget.id)),
-        Expanded(child: Text(widget.number)),
-        Expanded(child: Text(widget.text)),
-        Expanded(child: Text(widget.date)),
-        Expanded(child: Text(widget.status)),
-        widget.status == '0'
-            ? Container(child: const Icon(Icons.error))
-            : widget.status == '1'
-                ? Container(child: const CircularProgressIndicator())
-                : Container(child: const Icon(Icons.send_to_mobile))
-      ],
+    return InkWell(
+      onTap: () {
+        if (widget.status == '3') sendByApp(widget.number, widget.text);
+      },
+      child: Row(
+        children: [
+          Expanded(child: Text(widget.id)),
+          Expanded(child: Text(widget.number)),
+          Expanded(child: Text(widget.text)),
+          Expanded(child: Text(widget.date)),
+          Expanded(child: Text(widget.status)),
+          widget.status == '0'
+              ? Container(child: const Icon(Icons.fiber_new))
+              : widget.status == '1'
+                  ? Container(child: const CircularProgressIndicator())
+                  : widget.status == '2'
+                      ? Container(child: const Icon(Icons.sms_rounded))
+                      : Container(child: const Icon(Icons.error))
+        ],
+      ),
     );
+  }
+
+  sendByApp(String number, String text) async {
+    try {
+      String _result = await sendSMS(message: text, recipients: [number]);
+    } catch (e) {
+      print(e);
+    }
   }
 }
 
