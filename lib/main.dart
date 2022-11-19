@@ -24,7 +24,9 @@ Future<void> main() async {
   await Firebase.initializeApp();
 
   final fcmToken = await FirebaseMessaging.instance.getToken();
-  FirebaseMessaging.instance.onTokenRefresh.listen((fcmToken) {
+  FirebaseMessaging.instance.onTokenRefresh.listen((fcmToken) async {
+    fcmToken = (await FirebaseMessaging.instance.getToken())!;
+    print('New token: ${fcmToken}');
     // TODO: If necessary send token to application server.
 
     // Note: This callback is fired at each app startup and whenever a new
