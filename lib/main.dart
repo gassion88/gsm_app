@@ -1,4 +1,5 @@
 import 'dart:async' show Timer;
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -7,41 +8,21 @@ import 'package:gsm_app/const.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_sms/flutter_sms.dart';
 import 'package:sms_advanced/sms_advanced.dart';
-import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 
-@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // If you're going to use other Firebase services in the background, such as Firestore,
-  // make sure you call `initializeApp` before using other Firebase services.
-  await Firebase.initializeApp();
-
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
   try {
-    SmsQuery query = new SmsQuery();
-    List<SmsMessage> messages =
-        await query.querySms(kinds: [SmsQueryKind.Sent]);
+    SmsSender sen = SmsSender();
     Dio dio = Dio();
-    bool sended = false;
-
-    for (int i = 0; i <= messages.length - 1; i++) {
-      if (messages[i].body?.compareTo(message.data['text']) == 0) {
-        await dio.get(
-            'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=2');
-        sended = true;
-        print('Запрос на сервер');
-      }
-    }
-
-    if (!sended) {
-      await dio.get(
-          'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=3');
-      print('Сообщение не отправлено');
-    }
+    SmsMessage mess = SmsMessage(message.data['number'], message.data['text']);
+    await sen.sendSms(mess);
+    await dio.get(
+        'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=1');
+    print('Сообщение отправлено');
   } catch (e) {
     print(e);
   }
-
-  print("Handling a background message: ${message.messageId}");
 }
 
 Future<void> main() async {
