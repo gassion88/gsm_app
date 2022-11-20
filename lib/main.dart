@@ -16,6 +16,31 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // make sure you call `initializeApp` before using other Firebase services.
   await Firebase.initializeApp();
 
+  try {
+    SmsQuery query = new SmsQuery();
+    List<SmsMessage> messages =
+        await query.querySms(kinds: [SmsQueryKind.Sent]);
+    Dio dio = Dio();
+    bool sended = false;
+
+    for (int i = 0; i <= messages.length - 1; i++) {
+      if (messages[i].body?.compareTo(message.data['text']) == 0) {
+        await dio.get(
+            'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=2');
+        sended = true;
+        print('Запрос на сервер');
+      }
+    }
+
+    if (!sended) {
+      await dio.get(
+          'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=3');
+      print('Сообщение не отправлено');
+    }
+  } catch (e) {
+    print(e);
+  }
+
   print("Handling a background message: ${message.messageId}");
 }
 
