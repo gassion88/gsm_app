@@ -13,12 +13,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   try {
-    SmsSender sen = SmsSender();
-    Dio dio = Dio();
-    SmsMessage mess = SmsMessage(message.data['number'], message.data['text']);
-    await sen.sendSms(mess);
-    await dio.get(
-        'https://hvarna.ru/api/v1/gsm/status?id=${message.data['id']}&status=1');
     print('Сообщение отправлено');
   } catch (e) {
     print(e);
@@ -166,7 +160,6 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
               return false;
             }
           }
-          https: //hvarna.ru/api/v1/gsm/status?id=6&status=3
           if (!sended) {
             req = await dio.get(
                 'https://hvarna.ru/api/v1/gsm/status?id=${data[k]['id']}&status=3');
@@ -233,49 +226,6 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
     }
   }
 
-  /*Future<bool?> _sendSMS() async {
-    try {
-      for (int i = 0; i < data.length - 1; i++) {
-        if (data[i]['status'] == 0) {
-          setState(() {
-            sending = true;
-            print('Отправка смс');
-          });
-          break;
-        }
-      }
-      if (sending) {
-        for (int i = 0; i < data.length; i++) {
-          if (data[i]['status'] == 0) {
-            //Запуск анимации отправки
-            setState(() {
-              data[i]['status'] = '1';
-            });
-
-            //Отправка
-            await Future.delayed(const Duration(seconds: 1));
-            setState(() {
-              data[i]['status'] = '2';
-            });
-            break;
-          }
-        }
-
-        timer = Timer(const Duration(milliseconds: 3000), () {
-          setState(() {
-            sending = false;
-            print('Завершение отправки');
-            controller.value = 0.0;
-            controller.forward();
-          });
-        });
-      } else {}
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }*/
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -289,20 +239,7 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
                 autoSMS = value;
               });
             }),
-        Expanded(
-          child: Row(
-            children: const [
-              Expanded(
-                  child: Center(
-                child: Text('Отправлено'),
-              )),
-              Expanded(
-                  child: Center(
-                child: Text('Ошибки'),
-              ))
-            ],
-          ),
-        ),
+        const SizedBox(height: 30),
         Expanded(
           child: Column(
             children: [
@@ -347,12 +284,18 @@ class _MainState extends State<MainWidget> with SingleTickerProviderStateMixin {
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 10, horizontal: 10),
                                   child: SmsHistory(
-                                      id: data[index]['id'].toString(),
-                                      number: data[index]['number'].toString(),
-                                      text: data[index]['text'],
-                                      date: data[index]['created_at'],
-                                      status:
-                                          data[index]['status'].toString()));
+                                      id: data[data.length - index - 1]['id']
+                                          .toString(),
+                                      number: data[data.length - index - 1]
+                                              ['number']
+                                          .toString(),
+                                      text: data[data.length - index - 1]
+                                          ['text'],
+                                      date: data[data.length - index - 1]
+                                          ['created_at'],
+                                      status: data[data.length - index - 1]
+                                              ['status']
+                                          .toString()));
                             }),
                       ),
                     )
@@ -393,11 +336,20 @@ class _SmsHistoryState extends State<SmsHistory> {
       },
       child: Row(
         children: [
-          Expanded(child: Text(widget.id)),
-          Expanded(child: Text(widget.number)),
-          Expanded(child: Text(widget.text)),
+          Text(widget.id),
+          SizedBox(width: 20),
+          Text(widget.number),
+          Expanded(
+              child: Text(
+            widget.text,
+            textAlign: TextAlign.center,
+          )),
           Expanded(child: Text(widget.date)),
-          Expanded(child: Text(widget.status)),
+          Expanded(
+              child: Text(
+            widget.status,
+            textAlign: TextAlign.center,
+          )),
           widget.status == '0'
               ? Container(child: const Icon(Icons.fiber_new))
               : widget.status == '1'
